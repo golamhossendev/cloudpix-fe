@@ -1,6 +1,6 @@
 import { fetchBaseQuery } from '@reduxjs/toolkit/query/react';
 import type { BaseQueryFn, FetchArgs, FetchBaseQueryError } from '@reduxjs/toolkit/query';
-import { RootState } from '../store';
+import type { RootState } from '../store';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 

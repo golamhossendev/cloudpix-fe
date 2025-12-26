@@ -6,7 +6,6 @@ import { ShareLinksManager } from '../components/ShareLinksManager';
 import type { File } from '../types';
 import { formatFileSize, getFileIcon } from '../utils/fileUtils';
 import { useGetFilesQuery, useDeleteFileMutation } from '../store/api/filesApi';
-import { useCreateShareLinkMutation } from '../store/api/shareApi';
 import { useAuth } from '../hooks/useAuth';
 
 type FilterType = 'all' | 'images' | 'videos' | 'documents';
@@ -15,7 +14,6 @@ export const Files = () => {
   const { isAuthenticated } = useAuth();
   const { data: filesResponse, isLoading, refetch } = useGetFilesQuery(undefined, { skip: !isAuthenticated });
   const [deleteFile] = useDeleteFileMutation();
-  const [createShareLink] = useCreateShareLinkMutation();
   const files = filesResponse?.files || [];
   const [filter, setFilter] = useState<FilterType>('all');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -248,7 +246,7 @@ export const Files = () => {
         }}
         title="Share Links"
       >
-        {selectedFile && (
+        {selectedFile && selectedFile.id && selectedFile.name && (
           <ShareLinksManager
             fileId={selectedFile.id}
             fileName={selectedFile.name}

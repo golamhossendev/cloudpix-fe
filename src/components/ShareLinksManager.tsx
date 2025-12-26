@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from './Button';
-import { useGetShareLinksByFileIdQuery, useCreateShareLinkMutation, useRevokeShareLinkMutation, ShareLink } from '../store/api/shareApi';
+import { useGetShareLinksByFileIdQuery, useCreateShareLinkMutation, useRevokeShareLinkMutation } from '../store/api/shareApi';
+import type { ShareLink } from '../store/api/shareApi';
 import { format } from 'date-fns';
 import './ShareLinksManager.css';
 
@@ -23,7 +24,7 @@ export const ShareLinksManager = ({ fileId, fileName, onClose }: ShareLinksManag
   const handleCreateLink = async () => {
     setIsCreating(true);
     try {
-      const result = await createShareLink({ fileId, expirationDays }).unwrap();
+      await createShareLink({ fileId, expirationDays }).unwrap();
       (window as any).showAlert?.(`Share link created successfully!`, 'success');
       refetch();
     } catch (error: any) {

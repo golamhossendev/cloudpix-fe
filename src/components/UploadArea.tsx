@@ -1,4 +1,5 @@
-import { useRef, useState, DragEvent } from 'react';
+import { useRef, useState } from 'react';
+import type { DragEvent } from 'react';
 import { Button } from './Button';
 
 interface UploadAreaProps {

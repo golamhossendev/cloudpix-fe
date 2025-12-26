@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { UploadArea } from '../components/UploadArea';
 import { FileUploadList } from '../components/FileUploadList';
 import { Button } from '../components/Button';
-import { UploadFileItem } from '../types';
+import type { UploadFileItem } from '../types';
 import { isValidFileSize, isValidFileType } from '../utils/fileUtils';
 import { useUploadFileMutation } from '../store/api/filesApi';
 

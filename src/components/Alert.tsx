@@ -1,13 +1,18 @@
-import { ReactNode, useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 
 interface AlertProps {
   message: string;
-  type?: 'success' | 'error' | 'warning' | 'info';
+  type?: "success" | "error" | "warning" | "info";
   duration?: number;
   onClose?: () => void;
 }
 
-export const Alert = ({ message, type = 'info', duration = 5000, onClose }: AlertProps) => {
+export const Alert = ({
+  message,
+  type = "info",
+  duration = 5000,
+  onClose,
+}: AlertProps) => {
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
@@ -22,7 +27,7 @@ export const Alert = ({ message, type = 'info', duration = 5000, onClose }: Aler
 
   if (!isVisible) return null;
 
-  const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️';
+  const icon = type === "success" ? "✅" : type === "error" ? "❌" : "ℹ️";
 
   return (
     <div className={`alert alert-${type}`}>
@@ -31,4 +36,3 @@ export const Alert = ({ message, type = 'info', duration = 5000, onClose }: Aler
     </div>
   );
 };
-

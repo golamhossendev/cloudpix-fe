@@ -1,4 +1,4 @@
-import { UploadFileItem } from '../types';
+import type { UploadFileItem } from '../types';
 import { getFileIcon, formatFileSize } from '../utils/fileUtils';
 import { Button } from './Button';
 

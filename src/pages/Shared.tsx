@@ -6,7 +6,6 @@ import { ShareLinksManager } from '../components/ShareLinksManager';
 import type { File } from '../types';
 import { formatFileSize, getFileIcon } from '../utils/fileUtils';
 import { useGetFilesQuery, useDeleteFileMutation } from '../store/api/filesApi';
-import { useGetShareLinksByFileIdQuery } from '../store/api/shareApi';
 import { useAuth } from '../hooks/useAuth';
 import './Shared.css';
 
@@ -18,7 +17,7 @@ interface FileWithShareLinks extends File {
 }
 
 export const Shared = () => {
-  const { isAuthenticated, user, token } = useAuth();
+  const { isAuthenticated, token } = useAuth();
   const { data: filesResponse, isLoading: filesLoading, error: filesError, refetch } = useGetFilesQuery(undefined, { skip: !isAuthenticated });
   const [deleteFile] = useDeleteFileMutation();
   
@@ -42,7 +41,6 @@ export const Shared = () => {
       try {
 
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
-        const filesWithLinks: FileWithShareLinks[] = [];
         
         // Check share links for each file in parallel
         const shareLinkPromises = allFiles.map(async (file) => {
@@ -372,7 +370,7 @@ export const Shared = () => {
         }}
         title="Share Links"
       >
-        {selectedFile && (
+        {selectedFile && selectedFile.id && selectedFile.name && (
           <ShareLinksManager
             fileId={selectedFile.id}
             fileName={selectedFile.name}

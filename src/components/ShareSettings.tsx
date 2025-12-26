@@ -1,4 +1,4 @@
-import { ShareSettings as ShareSettingsType } from '../types';
+import type { ShareSettings as ShareSettingsType } from '../types';
 
 interface ShareSettingsProps {
   settings: ShareSettingsType;

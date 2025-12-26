@@ -9,7 +9,6 @@ import { ShareLinksManager } from '../components/ShareLinksManager';
 import type { File, UploadFileItem } from '../types';
 import { formatFileSize, getFileIcon, isValidFileSize, isValidFileType } from '../utils/fileUtils';
 import { useGetFilesQuery, useUploadFileMutation, useDeleteFileMutation } from '../store/api/filesApi';
-import { useCreateShareLinkMutation } from '../store/api/shareApi';
 import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard = () => {
@@ -17,7 +16,6 @@ export const Dashboard = () => {
   const { data: filesResponse, isLoading, refetch } = useGetFilesQuery(undefined, { skip: !isAuthenticated });
   const [uploadFile] = useUploadFileMutation();
   const [deleteFile] = useDeleteFileMutation();
-  const [createShareLink] = useCreateShareLinkMutation();
   
   const files = filesResponse?.files || [];
   const [selectedFiles, setSelectedFiles] = useState<UploadFileItem[]>([]);
@@ -328,7 +326,7 @@ export const Dashboard = () => {
         }}
         title="Share Links"
       >
-        {selectedFile && (
+        {selectedFile && selectedFile.id && selectedFile.name && (
           <ShareLinksManager
             fileId={selectedFile.id}
             fileName={selectedFile.name}

@@ -33,7 +33,7 @@ export const filesApi = createApi({
     }),
     getFileById: builder.query<File, string>({
       query: (id) => `/files/${id}`,
-      providesTags: (result, error, id) => [{ type: 'File', id }],
+      providesTags: (_result, _error, id) => [{ type: 'File', id }],
       transformResponse: (response: BackendFile) => normalizeFile(response),
     }),
     uploadFile: builder.mutation<File, FormData>({

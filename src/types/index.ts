@@ -61,7 +61,7 @@ export interface ShareSettings {
 export interface AppState {
   currentPage: string;
   files: File[];
-  selectedFiles: UploadFile[];
+  selectedFiles: UploadFileItem[];
   uploadProgress: Record<string, number>;
   user: User;
 }
