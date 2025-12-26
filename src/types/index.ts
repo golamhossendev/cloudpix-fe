@@ -1,21 +1,48 @@
 export interface File {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
+  fileId: string;
+  id?: string; // For backward compatibility
+  fileName: string;
+  name?: string; // For backward compatibility
+  contentType: string;
+  type?: string; // For backward compatibility
+  fileSize: number;
+  size?: number; // For backward compatibility
+  blobUrl?: string;
   thumbnail?: string;
   uploadDate: string;
-  isShared: boolean;
-  shareCount: number;
-  downloads: number;
+  createdAt?: string;
+  isShared?: boolean;
+  shareCount?: number;
+  downloads?: number;
   tags?: string[];
+  userId?: string;
 }
 
 export interface User {
-  name: string;
+  userId: string;
   email: string;
-  storageLimit: number;
-  storageUsed: number;
+  name?: string; // Optional for backward compatibility
+  storageLimit?: number;
+  storageUsed?: number;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: {
+    userId: string;
+    email: string;
+  };
+}
+
+export interface ShareLink {
+  linkId: string;
+  fileId: string;
+  userId: string;
+  createdAt: string;
+  expiresAt?: string;
+  isRevoked: boolean;
+  accessCount: number;
+  shareUrl?: string;
 }
 
 export interface UploadFileItem {

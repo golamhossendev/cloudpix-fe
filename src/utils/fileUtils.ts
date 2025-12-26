@@ -39,3 +39,46 @@ export const isValidFileSize = (file: globalThis.File, maxSizeMB: number = 100):
   return file.size <= maxSizeMB * 1024 * 1024;
 };
 
+import { format } from 'date-fns';
+import type { File } from '../types';
+
+// Helper to normalize file data from API to consistent format
+export const normalizeFile = (file: any): File => {
+  // Handle date conversion - backend may send Date object or ISO string
+  let uploadDate: string;
+  if (file.uploadDate instanceof Date) {
+    uploadDate = format(file.uploadDate, 'yyyy-MM-dd');
+  } else if (typeof file.uploadDate === 'string') {
+    uploadDate = format(new Date(file.uploadDate), 'yyyy-MM-dd');
+  } else {
+    uploadDate = format(new Date(), 'yyyy-MM-dd');
+  }
+
+  // Generate thumbnail URL - use blobUrl for images, placeholder for others
+  let thumbnail: string;
+  if (file.contentType?.startsWith('image/') && file.blobUrl) {
+    thumbnail = file.blobUrl;
+  } else {
+    thumbnail = getFileThumbnail(file.contentType || file.type || '');
+  }
+
+  return {
+    id: file.fileId || file.id || '',
+    fileId: file.fileId || file.id || '',
+    name: file.fileName || file.name || '',
+    fileName: file.fileName || file.name || '',
+    type: file.contentType || file.type || '',
+    contentType: file.contentType || file.type || '',
+    size: file.fileSize || file.size || 0,
+    fileSize: file.fileSize || file.size || 0,
+    thumbnail,
+    blobUrl: file.blobUrl || '',
+    uploadDate,
+    isShared: file.isShared || false,
+    shareCount: file.shareCount || 0,
+    downloads: file.downloads || 0,
+    tags: file.tags || [],
+    userId: file.userId,
+  };
+};
+

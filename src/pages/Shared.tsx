@@ -3,7 +3,7 @@ import { FileCard } from '../components/FileCard';
 import { Modal } from '../components/Modal';
 import { Button } from '../components/Button';
 import { File } from '../types';
-import { formatFileSize, getFileIcon } from '../utils/fileUtils';
+import { formatFileSize, getFileIcon, normalizeFile } from '../utils/fileUtils';
 import { useGetFilesQuery } from '../store/api/filesApi';
 
 const sampleFiles: File[] = [
@@ -46,7 +46,9 @@ const sampleFiles: File[] = [
 ];
 
 export const Shared = () => {
-  const { data: files = sampleFiles } = useGetFilesQuery();
+  const { data: filesResponse } = useGetFilesQuery();
+  const rawFiles = filesResponse?.files || sampleFiles;
+  const files = rawFiles.map(normalizeFile);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 

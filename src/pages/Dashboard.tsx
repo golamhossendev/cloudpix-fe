@@ -1,74 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { StatsCard } from '../components/StatsCard';
 import { UploadArea } from '../components/UploadArea';
 import { FileUploadList } from '../components/FileUploadList';
-import { ShareSettings } from '../components/ShareSettings';
 import { FileCard } from '../components/FileCard';
 import { Modal } from '../components/Modal';
 import { Button } from '../components/Button';
-import { File, UploadFileItem, ShareSettings as ShareSettingsType } from '../types';
-import { formatFileSize, getFileIcon, getFileThumbnail, isValidFileSize, isValidFileType } from '../utils/fileUtils';
-import { useGetFilesQuery } from '../store/api/filesApi';
-
-const sampleFiles: File[] = [
-  {
-    id: '1',
-    name: 'sunrise_mountains.jpg',
-    type: 'image/jpeg',
-    size: 5242880,
-    thumbnail: 'https://via.placeholder.com/300x200/4A90E2/FFFFFF?text=Sunrise+Mountains',
-    uploadDate: '2024-01-15',
-    isShared: true,
-    shareCount: 42,
-    downloads: 156,
-    tags: ['nature', 'mountains', 'sunrise']
-  },
-  {
-    id: '2',
-    name: 'beach_vacation.mp4',
-    type: 'video/mp4',
-    size: 104857600,
-    thumbnail: 'https://via.placeholder.com/300x200/50E3C2/FFFFFF?text=Beach+Video',
-    uploadDate: '2024-01-10',
-    isShared: true,
-    shareCount: 28,
-    downloads: 89,
-    tags: ['beach', 'vacation', 'travel']
-  },
-  {
-    id: '3',
-    name: 'business_presentation.pdf',
-    type: 'application/pdf',
-    size: 2097152,
-    thumbnail: 'https://via.placeholder.com/300x200/9013FE/FFFFFF?text=PDF+Document',
-    uploadDate: '2024-01-05',
-    isShared: false,
-    shareCount: 0,
-    downloads: 12,
-    tags: ['business', 'presentation']
-  },
-  {
-    id: '4',
-    name: 'city_night.jpg',
-    type: 'image/jpeg',
-    size: 3145728,
-    thumbnail: 'https://via.placeholder.com/300x200/417505/FFFFFF?text=City+Night',
-    uploadDate: '2024-01-01',
-    isShared: true,
-    shareCount: 15,
-    downloads: 67,
-    tags: ['city', 'night', 'photography']
-  }
-];
+import { File, UploadFileItem } from '../types';
+import { formatFileSize, getFileIcon, isValidFileSize, isValidFileType } from '../utils/fileUtils';
+import { useGetFilesQuery, useUploadFileMutation, useDeleteFileMutation } from '../store/api/filesApi';
+import { useAuth } from '../hooks/useAuth';
 
 export const Dashboard = () => {
-  const { data: files = sampleFiles } = useGetFilesQuery();
+  const { isAuthenticated } = useAuth();
+  const { data: filesResponse, isLoading, refetch } = useGetFilesQuery(undefined, { skip: !isAuthenticated });
+  const [uploadFile] = useUploadFileMutation();
+  const [deleteFile] = useDeleteFileMutation();
+  
+  const files = filesResponse?.files || [];
   const [selectedFiles, setSelectedFiles] = useState<UploadFileItem[]>([]);
-  const [shareSettings, setShareSettings] = useState<ShareSettingsType>({
-    expiration: '7d',
-    privacy: 'public',
-    maxViews: 100,
-  });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -115,20 +64,46 @@ export const Dashboard = () => {
 
     setIsUploading(true);
 
-    // Simulate upload progress
-    for (let i = 0; i < selectedFiles.length; i++) {
-      const fileObj = selectedFiles[i];
-      for (let progress = 0; progress <= 100; progress += 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        setSelectedFiles(prev => prev.map((f, idx) => 
-          idx === i ? { ...f, progress } : f
-        ));
-      }
-    }
+    try {
+      // Upload files one by one
+      for (let i = 0; i < selectedFiles.length; i++) {
+        const fileObj = selectedFiles[i];
+        const formData = new FormData();
+        formData.append('file', fileObj.file);
 
-    setIsUploading(false);
-    setSelectedFiles([]);
-    (window as any).showAlert?.('Files uploaded successfully!', 'success');
+        // Update progress simulation
+        for (let progress = 0; progress <= 90; progress += 30) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          setSelectedFiles(prev => prev.map((f, idx) => 
+            idx === i ? { ...f, progress } : f
+          ));
+        }
+
+        try {
+          await uploadFile(formData).unwrap();
+          setSelectedFiles(prev => prev.map((f, idx) => 
+            idx === i ? { ...f, progress: 100 } : f
+          ));
+          (window as any).showAlert?.(`File ${fileObj.file.name} uploaded successfully!`, 'success');
+        } catch (error: any) {
+          (window as any).showAlert?.(
+            `Failed to upload ${fileObj.file.name}: ${error?.data?.error || error?.message || 'Unknown error'}`,
+            'error'
+          );
+        }
+      }
+
+      // Refresh files list after upload
+      refetch();
+      setSelectedFiles([]);
+    } catch (error: any) {
+      (window as any).showAlert?.(
+        `Upload failed: ${error?.data?.error || error?.message || 'Unknown error'}`,
+        'error'
+      );
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleViewFile = (file: File) => {
@@ -147,16 +122,28 @@ export const Dashboard = () => {
   };
 
   const handleDownloadFile = (file: File) => {
-    file.downloads = (file.downloads || 0) + 1;
-    (window as any).showAlert?.(`Downloading ${file.name}...`, 'success');
-    console.log('Downloading file:', file.name);
+    if (file.blobUrl) {
+      window.open(file.blobUrl, '_blank');
+      (window as any).showAlert?.(`Downloading ${file.name}...`, 'success');
+    } else {
+      (window as any).showAlert?.(`File URL not available for ${file.name}`, 'error');
+    }
   };
 
-  const handleDeleteFile = () => {
+  const handleDeleteFile = async () => {
     if (selectedFile) {
-      (window as any).showAlert?.(`File "${selectedFile.name}" deleted`, 'success');
-      setIsModalOpen(false);
-      setSelectedFile(null);
+      try {
+        await deleteFile(selectedFile.id).unwrap();
+        (window as any).showAlert?.(`File "${selectedFile.name}" deleted`, 'success');
+        setIsModalOpen(false);
+        setSelectedFile(null);
+        refetch(); // Refresh files list after deletion
+      } catch (error: any) {
+        (window as any).showAlert?.(
+          `Failed to delete file: ${error?.data?.error || error?.message || 'Unknown error'}`,
+          'error'
+        );
+      }
     }
   };
 
@@ -170,6 +157,10 @@ export const Dashboard = () => {
   };
 
   const recentFiles = files.slice(0, 4);
+
+  if (isLoading) {
+    return <div>Loading files...</div>;
+  }
 
   return (
     <>
@@ -188,8 +179,6 @@ export const Dashboard = () => {
 
         <UploadArea onFilesSelected={handleFilesSelected} />
         <FileUploadList files={selectedFiles} onRemove={handleRemoveFile} />
-        
-        <ShareSettings settings={shareSettings} onChange={setShareSettings} />
 
         <div style={{ textAlign: 'center', marginTop: '2rem' }}>
           <Button 

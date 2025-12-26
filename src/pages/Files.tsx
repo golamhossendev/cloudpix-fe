@@ -4,63 +4,16 @@ import { Modal } from '../components/Modal';
 import { Button } from '../components/Button';
 import { File } from '../types';
 import { formatFileSize, getFileIcon } from '../utils/fileUtils';
-import { useGetFilesQuery } from '../store/api/filesApi';
-
-const sampleFiles: File[] = [
-  {
-    id: '1',
-    name: 'sunrise_mountains.jpg',
-    type: 'image/jpeg',
-    size: 5242880,
-    thumbnail: 'https://via.placeholder.com/300x200/4A90E2/FFFFFF?text=Sunrise+Mountains',
-    uploadDate: '2024-01-15',
-    isShared: true,
-    shareCount: 42,
-    downloads: 156,
-    tags: ['nature', 'mountains', 'sunrise']
-  },
-  {
-    id: '2',
-    name: 'beach_vacation.mp4',
-    type: 'video/mp4',
-    size: 104857600,
-    thumbnail: 'https://via.placeholder.com/300x200/50E3C2/FFFFFF?text=Beach+Video',
-    uploadDate: '2024-01-10',
-    isShared: true,
-    shareCount: 28,
-    downloads: 89,
-    tags: ['beach', 'vacation', 'travel']
-  },
-  {
-    id: '3',
-    name: 'business_presentation.pdf',
-    type: 'application/pdf',
-    size: 2097152,
-    thumbnail: 'https://via.placeholder.com/300x200/9013FE/FFFFFF?text=PDF+Document',
-    uploadDate: '2024-01-05',
-    isShared: false,
-    shareCount: 0,
-    downloads: 12,
-    tags: ['business', 'presentation']
-  },
-  {
-    id: '4',
-    name: 'city_night.jpg',
-    type: 'image/jpeg',
-    size: 3145728,
-    thumbnail: 'https://via.placeholder.com/300x200/417505/FFFFFF?text=City+Night',
-    uploadDate: '2024-01-01',
-    isShared: true,
-    shareCount: 15,
-    downloads: 67,
-    tags: ['city', 'night', 'photography']
-  }
-];
+import { useGetFilesQuery, useDeleteFileMutation } from '../store/api/filesApi';
+import { useAuth } from '../hooks/useAuth';
 
 type FilterType = 'all' | 'images' | 'videos' | 'documents';
 
 export const Files = () => {
-  const { data: files = sampleFiles } = useGetFilesQuery();
+  const { isAuthenticated } = useAuth();
+  const { data: filesResponse, isLoading, refetch } = useGetFilesQuery(undefined, { skip: !isAuthenticated });
+  const [deleteFile] = useDeleteFileMutation();
+  const files = filesResponse?.files || [];
   const [filter, setFilter] = useState<FilterType>('all');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -79,26 +32,33 @@ export const Files = () => {
   };
 
   const handleShareFile = (file: File) => {
-    file.isShared = !file.isShared;
-    if (file.isShared) {
-      file.shareCount = (file.shareCount || 0) + 1;
-      (window as any).showAlert?.('File is now shared publicly', 'success');
-    } else {
-      (window as any).showAlert?.('File sharing disabled', 'warning');
-    }
+    // Share functionality will be handled by share API
+    (window as any).showAlert?.('Share functionality coming soon', 'info');
   };
 
   const handleDownloadFile = (file: File) => {
-    file.downloads = (file.downloads || 0) + 1;
-    (window as any).showAlert?.(`Downloading ${file.name}...`, 'success');
-    console.log('Downloading file:', file.name);
+    if (file.blobUrl) {
+      window.open(file.blobUrl, '_blank');
+      (window as any).showAlert?.(`Downloading ${file.name}...`, 'success');
+    } else {
+      (window as any).showAlert?.(`File URL not available for ${file.name}`, 'error');
+    }
   };
 
-  const handleDeleteFile = () => {
+  const handleDeleteFile = async () => {
     if (selectedFile) {
-      (window as any).showAlert?.(`File "${selectedFile.name}" deleted`, 'success');
-      setIsModalOpen(false);
-      setSelectedFile(null);
+      try {
+        await deleteFile(selectedFile.id).unwrap();
+        (window as any).showAlert?.(`File "${selectedFile.name}" deleted`, 'success');
+        setIsModalOpen(false);
+        setSelectedFile(null);
+        refetch(); // Refresh files list after deletion
+      } catch (error: any) {
+        (window as any).showAlert?.(
+          `Failed to delete file: ${error?.data?.error || error?.message || 'Unknown error'}`,
+          'error'
+        );
+      }
     }
   };
 
@@ -110,6 +70,10 @@ export const Files = () => {
       (window as any).showAlert?.('Link copied to clipboard!', 'success');
     }
   };
+
+  if (isLoading) {
+    return <div>Loading files...</div>;
+  }
 
   return (
     <>
