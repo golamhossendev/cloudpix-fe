@@ -2,84 +2,61 @@ import { useState } from 'react';
 import { FileCard } from '../components/FileCard';
 import { Modal } from '../components/Modal';
 import { Button } from '../components/Button';
-import { File } from '../types';
-import { formatFileSize, getFileIcon, normalizeFile } from '../utils/fileUtils';
-import { useGetFilesQuery } from '../store/api/filesApi';
-
-const sampleFiles: File[] = [
-  {
-    id: '1',
-    name: 'sunrise_mountains.jpg',
-    type: 'image/jpeg',
-    size: 5242880,
-    thumbnail: 'https://via.placeholder.com/300x200/4A90E2/FFFFFF?text=Sunrise+Mountains',
-    uploadDate: '2024-01-15',
-    isShared: true,
-    shareCount: 42,
-    downloads: 156,
-    tags: ['nature', 'mountains', 'sunrise']
-  },
-  {
-    id: '2',
-    name: 'beach_vacation.mp4',
-    type: 'video/mp4',
-    size: 104857600,
-    thumbnail: 'https://via.placeholder.com/300x200/50E3C2/FFFFFF?text=Beach+Video',
-    uploadDate: '2024-01-10',
-    isShared: true,
-    shareCount: 28,
-    downloads: 89,
-    tags: ['beach', 'vacation', 'travel']
-  },
-  {
-    id: '4',
-    name: 'city_night.jpg',
-    type: 'image/jpeg',
-    size: 3145728,
-    thumbnail: 'https://via.placeholder.com/300x200/417505/FFFFFF?text=City+Night',
-    uploadDate: '2024-01-01',
-    isShared: true,
-    shareCount: 15,
-    downloads: 67,
-    tags: ['city', 'night', 'photography']
-  }
-];
+import { ShareLinksManager } from '../components/ShareLinksManager';
+import type { File } from '../types';
+import { formatFileSize, getFileIcon } from '../utils/fileUtils';
+import { useGetFilesQuery, useDeleteFileMutation } from '../store/api/filesApi';
+import { useCreateShareLinkMutation } from '../store/api/shareApi';
+import { useAuth } from '../hooks/useAuth';
 
 export const Shared = () => {
-  const { data: filesResponse } = useGetFilesQuery();
-  const rawFiles = filesResponse?.files || sampleFiles;
-  const files = rawFiles.map(normalizeFile);
+  const { isAuthenticated } = useAuth();
+  const { data: filesResponse, isLoading, refetch } = useGetFilesQuery(undefined, { skip: !isAuthenticated });
+  const [deleteFile] = useDeleteFileMutation();
+  const [createShareLink] = useCreateShareLinkMutation();
+  
+  const allFiles = filesResponse?.files || [];
+  // Filter files that are shared (have isShared flag or shareCount > 0)
+  // Note: In a real implementation, you'd query share links from backend
+  const files = allFiles.filter(file => file.isShared || (file.shareCount && file.shareCount > 0));
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const sharedFiles = files.filter(file => file.isShared);
+  const [isShareLinksModalOpen, setIsShareLinksModalOpen] = useState(false);
 
   const handleViewFile = (file: File) => {
     setSelectedFile(file);
     setIsModalOpen(true);
   };
 
-  const handleShareFile = (file: File) => {
-    file.isShared = !file.isShared;
-    if (file.isShared) {
-      file.shareCount = (file.shareCount || 0) + 1;
-      (window as any).showAlert?.('File is now shared publicly', 'success');
-    } else {
-      (window as any).showAlert?.('File sharing disabled', 'warning');
-    }
+  const handleShareFile = async (file: File) => {
+    // Open share links manager modal instead of creating link directly
+    setSelectedFile(file);
+    setIsShareLinksModalOpen(true);
   };
 
   const handleDownloadFile = (file: File) => {
-    file.downloads = (file.downloads || 0) + 1;
-    (window as any).showAlert?.(`Downloading ${file.name}...`, 'success');
-    console.log('Downloading file:', file.name);
+    if (file.blobUrl) {
+      window.open(file.blobUrl, '_blank');
+      (window as any).showAlert?.(`Downloading ${file.name}...`, 'success');
+    } else {
+      (window as any).showAlert?.(`File URL not available for ${file.name}`, 'error');
+    }
   };
 
-  const handleDeleteFile = () => {
-    if (selectedFile) {
-      (window as any).showAlert?.(`File "${selectedFile.name}" deleted`, 'success');
-      setIsModalOpen(false);
-      setSelectedFile(null);
+  const handleDeleteFile = async () => {
+    if (selectedFile && selectedFile.id) {
+      try {
+        await deleteFile(selectedFile.id).unwrap();
+        (window as any).showAlert?.(`File "${selectedFile.name}" deleted`, 'success');
+        setIsModalOpen(false);
+        setSelectedFile(null);
+        refetch(); // Refresh files list after deletion
+      } catch (error: any) {
+        (window as any).showAlert?.(
+          `Failed to delete file: ${error?.data?.error || error?.message || 'Unknown error'}`,
+          'error'
+        );
+      }
     }
   };
 
@@ -92,19 +69,23 @@ export const Shared = () => {
     }
   };
 
+  if (isLoading) {
+    return <div>Loading shared files...</div>;
+  }
+
   return (
     <>
       <h2 style={{ marginBottom: '2rem' }}>Shared Files</h2>
       
       <div className="files-grid">
-        {sharedFiles.length === 0 ? (
+        {files.length === 0 ? (
           <div className="empty-state">
             <div className="empty-icon">🔗</div>
             <h3>No shared files</h3>
             <p>Share a file to see it here</p>
           </div>
         ) : (
-          sharedFiles.map(file => (
+          files.map(file => (
             <FileCard
               key={file.id}
               file={file}
@@ -137,16 +118,39 @@ export const Shared = () => {
         {selectedFile && (
           <>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>
-                {getFileIcon(selectedFile.type)}
-              </div>
+              {selectedFile.type?.startsWith('image/') && selectedFile.blobUrl ? (
+                <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+                  <img 
+                    src={selectedFile.blobUrl} 
+                    alt={selectedFile.name}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '400px',
+                      borderRadius: 'var(--border-radius)',
+                      boxShadow: 'var(--shadow)',
+                      objectFit: 'contain',
+                      background: 'var(--light-gray)',
+                      padding: '0.5rem'
+                    }}
+                    onError={(e) => {
+                      // Fallback to icon if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>
+                  {getFileIcon(selectedFile.type || '')}
+                </div>
+              )}
               <h3>{selectedFile.name}</h3>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
               <div style={{ background: 'var(--light-gray)', padding: '1rem', borderRadius: 'var(--border-radius)' }}>
                 <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Size</div>
-                <div style={{ fontWeight: 600 }}>{formatFileSize(selectedFile.size)}</div>
+                <div style={{ fontWeight: 600 }}>{formatFileSize(selectedFile.size || 0)}</div>
               </div>
               <div style={{ background: 'var(--light-gray)', padding: '1rem', borderRadius: 'var(--border-radius)' }}>
                 <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Upload Date</div>
@@ -184,29 +188,41 @@ export const Shared = () => {
               </div>
             )}
 
-            {selectedFile.isShared && (
-              <div style={{ background: 'rgba(0, 102, 204, 0.1)', padding: '1rem', borderRadius: 'var(--border-radius)', marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <span>🔗</span>
-                  <span style={{ fontWeight: 600 }}>Shared Publicly</span>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    id="shareLinkInput"
-                    value={`${window.location.origin}/share/${selectedFile.id}`}
-                    readOnly
-                    style={{
-                      flex: 1,
-                      padding: '0.5rem',
-                      border: '1px solid var(--light-gray)',
-                      borderRadius: 'var(--border-radius)'
-                    }}
-                  />
-                </div>
-              </div>
-            )}
+            <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--light-gray)' }}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setIsShareLinksModalOpen(true);
+                }}
+                style={{ width: '100%' }}
+              >
+                Manage Share Links
+              </Button>
+            </div>
           </>
+        )}
+      </Modal>
+
+      {/* Share Links Manager Modal */}
+      <Modal
+        isOpen={isShareLinksModalOpen}
+        onClose={() => {
+          setIsShareLinksModalOpen(false);
+          setSelectedFile(null);
+        }}
+        title="Share Links"
+      >
+        {selectedFile && (
+          <ShareLinksManager
+            fileId={selectedFile.id}
+            fileName={selectedFile.name}
+            onClose={() => {
+              setIsShareLinksModalOpen(false);
+              setSelectedFile(null);
+              refetch(); // Refresh files list
+            }}
+          />
         )}
       </Modal>
     </>

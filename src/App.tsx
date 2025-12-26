@@ -6,6 +6,7 @@ import { Files } from './pages/Files';
 import { Shared } from './pages/Shared';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
+import { ShareView } from './pages/ShareView';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export const App = () => {
@@ -14,6 +15,7 @@ export const App = () => {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/share/:linkId" element={<ShareView />} />
         <Route
           path="/"
           element={

@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { FileCard } from '../components/FileCard';
 import { Modal } from '../components/Modal';
 import { Button } from '../components/Button';
-import { File } from '../types';
+import { ShareLinksManager } from '../components/ShareLinksManager';
+import type { File } from '../types';
 import { formatFileSize, getFileIcon } from '../utils/fileUtils';
 import { useGetFilesQuery, useDeleteFileMutation } from '../store/api/filesApi';
+import { useCreateShareLinkMutation } from '../store/api/shareApi';
 import { useAuth } from '../hooks/useAuth';
 
 type FilterType = 'all' | 'images' | 'videos' | 'documents';
@@ -13,15 +15,17 @@ export const Files = () => {
   const { isAuthenticated } = useAuth();
   const { data: filesResponse, isLoading, refetch } = useGetFilesQuery(undefined, { skip: !isAuthenticated });
   const [deleteFile] = useDeleteFileMutation();
+  const [createShareLink] = useCreateShareLinkMutation();
   const files = filesResponse?.files || [];
   const [filter, setFilter] = useState<FilterType>('all');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isShareLinksModalOpen, setIsShareLinksModalOpen] = useState(false);
 
   const filteredFiles = files.filter(file => {
     if (filter === 'all') return true;
-    if (filter === 'images') return file.type.startsWith('image/');
-    if (filter === 'videos') return file.type.startsWith('video/');
+    if (filter === 'images') return file.type?.startsWith('image/');
+    if (filter === 'videos') return file.type?.startsWith('video/');
     if (filter === 'documents') return file.type === 'application/pdf';
     return true;
   });
@@ -31,9 +35,10 @@ export const Files = () => {
     setIsModalOpen(true);
   };
 
-  const handleShareFile = (file: File) => {
-    // Share functionality will be handled by share API
-    (window as any).showAlert?.('Share functionality coming soon', 'info');
+  const handleShareFile = async (file: File) => {
+    // Open share links manager modal instead of creating link directly
+    setSelectedFile(file);
+    setIsShareLinksModalOpen(true);
   };
 
   const handleDownloadFile = (file: File) => {
@@ -46,7 +51,7 @@ export const Files = () => {
   };
 
   const handleDeleteFile = async () => {
-    if (selectedFile) {
+    if (selectedFile && selectedFile.id) {
       try {
         await deleteFile(selectedFile.id).unwrap();
         (window as any).showAlert?.(`File "${selectedFile.name}" deleted`, 'success');
@@ -148,16 +153,39 @@ export const Files = () => {
         {selectedFile && (
           <>
             <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-              <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>
-                {getFileIcon(selectedFile.type)}
-              </div>
+              {selectedFile.type?.startsWith('image/') && selectedFile.blobUrl ? (
+                <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+                  <img 
+                    src={selectedFile.blobUrl} 
+                    alt={selectedFile.name}
+                    style={{
+                      maxWidth: '100%',
+                      maxHeight: '400px',
+                      borderRadius: 'var(--border-radius)',
+                      boxShadow: 'var(--shadow)',
+                      objectFit: 'contain',
+                      background: 'var(--light-gray)',
+                      padding: '0.5rem'
+                    }}
+                    onError={(e) => {
+                      // Fallback to icon if image fails to load
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              ) : (
+                <div style={{ fontSize: '4rem', marginBottom: '1rem' }}>
+                  {getFileIcon(selectedFile.type || '')}
+                </div>
+              )}
               <h3>{selectedFile.name}</h3>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem', marginBottom: '2rem' }}>
               <div style={{ background: 'var(--light-gray)', padding: '1rem', borderRadius: 'var(--border-radius)' }}>
                 <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Size</div>
-                <div style={{ fontWeight: 600 }}>{formatFileSize(selectedFile.size)}</div>
+                <div style={{ fontWeight: 600 }}>{formatFileSize(selectedFile.size || 0)}</div>
               </div>
               <div style={{ background: 'var(--light-gray)', padding: '1rem', borderRadius: 'var(--border-radius)' }}>
                 <div style={{ fontSize: '0.9rem', color: 'var(--gray)' }}>Upload Date</div>
@@ -195,29 +223,41 @@ export const Files = () => {
               </div>
             )}
 
-            {selectedFile.isShared && (
-              <div style={{ background: 'rgba(0, 102, 204, 0.1)', padding: '1rem', borderRadius: 'var(--border-radius)', marginBottom: '1.5rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  <span>🔗</span>
-                  <span style={{ fontWeight: 600 }}>Shared Publicly</span>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    id="shareLinkInput"
-                    value={`${window.location.origin}/share/${selectedFile.id}`}
-                    readOnly
-                    style={{
-                      flex: 1,
-                      padding: '0.5rem',
-                      border: '1px solid var(--light-gray)',
-                      borderRadius: 'var(--border-radius)'
-                    }}
-                  />
-                </div>
-              </div>
-            )}
+            <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--light-gray)' }}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setIsModalOpen(false);
+                  setIsShareLinksModalOpen(true);
+                }}
+                style={{ width: '100%' }}
+              >
+                Manage Share Links
+              </Button>
+            </div>
           </>
+        )}
+      </Modal>
+
+      {/* Share Links Manager Modal */}
+      <Modal
+        isOpen={isShareLinksModalOpen}
+        onClose={() => {
+          setIsShareLinksModalOpen(false);
+          setSelectedFile(null);
+        }}
+        title="Share Links"
+      >
+        {selectedFile && (
+          <ShareLinksManager
+            fileId={selectedFile.id}
+            fileName={selectedFile.name}
+            onClose={() => {
+              setIsShareLinksModalOpen(false);
+              setSelectedFile(null);
+              refetch(); // Refresh files list
+            }}
+          />
         )}
       </Modal>
     </>
