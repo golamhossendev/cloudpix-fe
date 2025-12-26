@@ -2,27 +2,26 @@ name: Build & Deploy Vite App (Preview Mode) — cloudpix-fee
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
           node-version: "20.x"
-
       - name: Install dependencies & build
         run: |
           npm ci
           npm run build
-
-      # Upload only what Azure needs — NO node_modules
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -39,20 +38,18 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build
-
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: app
-
       - name: Azure Login
         uses: azure/login@v2
         with:
+          auth-type: oidc
           client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_9A7C6C40B9CE49D1B098CB738FA5CDB3 }}
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_12C9A230694F45688F0C73BBFBE19AAD }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_7345F62BF7E848CFA29BEDB9E300EAA2 }}
-
       - name: Deploy to Azure Web App (no Oryx)
         uses: azure/webapps-deploy@v3
         with:
